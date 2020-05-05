@@ -1,0 +1,290 @@
+---
+title: "Project 1"
+author: "Ryn M"
+date: "3/14/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+In this project, we will explore this Housing data by using price as the response variable and trying to find how the other variables can be used to predict the price of a House.  
+
+Below, we have imported the data.
+```{r}
+library(readxl)
+housing <- read_excel("Housing.xlsx")
+head(housing)
+```
+
+
+### Data Summary
+
+Now, we will look at the data itself to make sure it is in a good condition to be used for our modeling that will come later.  Lukcily, no data points are missing, so there is no need to remove any data because of that.  One point that strikes me as unsual based upon reading the data is point [74] because it has a lot size of 11 when all other lot sizes in this data are size 8 and below, with most being between sizes 1 and 5.  The price of the house for this point is the second most expensive house, so we may explore lot size as a predicting factor later on because of this.  One thing about this data that I believe needs clarification is the amount of bathrooms.  Any number that is not an integer is listed with a .1 , whereas it was to my understanding that a half bathroom would be counted with a .5 (ex. 2.5 instead of 2.1 bathrooms).  This may be a numerical error that we should change by adding a new column with the .5 decimal to indicate half bathrooms instead.  I also find it unusual that the house with the most amount of bedrooms, data point [35], has what I would consider to be small square footage for a house with 6 bedrooms. It also has a very low age standard size, meaning that the house was small relative to the other houses built at the time.  This could mean there is an input error for the number of bedrooms for this house or some other reason it has 6 bedrooms with small square footage.  We will keep our eye on this point to see how it affects the data later.  The final point that I will mention is that the most expensive house, point [2] at $450,000 , has an age standard size score of -1.3, meaning it is more than one standard deviation below the mean.  This is unexpected for such an expensive house, but it leads me to believe that size of the house is definitely not the only predicting factor for a house's price.  
+
+
+Below are the ranges, mins, and maxes for each variable
+```{r}
+sapply(housing, range)
+sapply(housing, min)
+sapply(housing, max)
+```
+
+
+
+
+Note:
+* add new bathroom column with 0.5 decimals
+* explore lot size as a predictor
+*     find range of each column
+*     do a predictor matrix
+*     create a factor column for elementary school district (?)
+
+
+### Exploratory Data Analysis
+
+First, we will manipulate the data a little bit depending on the observations made above.
+We will change both the status and the elementary school district to be numeric.  This will help in being able to use these as predictor variables.
+  * status will be 1-active, 2-pending, and 3-sold
+  * elem will be 1-Adams, 2-Crest, 3-Edge, 4-Edison, 5-Harris, 6-Parker
+```{r}
+housing$elem <- as.numeric(as.factor(housing$elem))
+housing$status <- as.numeric(as.factor(housing$status))
+#head(housing)
+#sapply(housing, class)
+```
+
+To start, we will create a matrix to have a visual of how the variables may relate to each other.
+```{r}
+pairs(housing[,2:11])
+cor(housing [,2:11])
+```
+
+```{r}
+mrm <- lm(price ~ .-id, data = housing)
+summary(mrm)
+```
+
+```{r}
+mrm2 = lm(price ~ size + lot  + bedrooms, data = housing)
+summary(mrm2)
+
+mrm3 <- lm(price ~ size + size:lot + bath:bedrooms, data = housing)
+summary(mrm3)
+
+#mrm4 <- lm(price ~ size + I(size:lot) + I(bath:bedrooms, data = housing)
+#summary(mrm4)
+```
+```{r}
+newdat <- data.frame(size=1.000, lot=5, bedrooms=3)
+head(newdat)
+predict(mrm2, newdat, interval = "confidence")
+
+predict(mrm2, data.frame(size=1.000, lot=5, bedrooms=3))
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+# NEW WORK
+
+Remember the model we're using for this project is 
+
+### (a)
+```{r}
+original_housing_model <- lm(price ~ size + lot + bedrooms, data = housing)
+```
+
+### (b)
+
+```{r}
+library(leaps)
+regfit_all <- regsubsets(price ~ ., data = housing) #overall
+(regfit_all_summary <- summary(regfit_all))
+names(regfit_all_summary)
+```
+It's interesting to me that with one predictor, garagesize is the best, but with two predictors, size and bedrooms should be used rather than garage and garage is not a useful predictor again until 6 or more predictors are used.  Out of the 4 predictors in the set with 4, we had already used 3 of them in our original model.  
+
+```{r}
+fwdregfit_all <- regsubsets(price ~., data = housing, method = "forward")
+bwdregfit_all <- regsubsets(price ~., data = housing, method = "backward")
+
+(fwdregfit_all_summary <- summary(fwdregfit_all))
+(bwdregfit_all_summary <- summary(bwdregfit_all))
+```
+To determine which is the best predictor, we'll look at the R^2 variable
+
+```{r}
+regfit_all_summary$rsq
+fwdregfit_all_summary$rsq
+bwdregfit_all_summary$rsq
+```
+
+What other variables could we use? r-squared doesn't really help, but I'm not sure what the other variables really even mean. 
+
+```{r}
+par(mfrow = c(2,2))
+plot(regfit_all_summary$rss, xlab = "Numer of Variables", ylab = "RSS", type ="l")
+plot(regfit_all_summary$adjr2, xlab = "Number of Variables", ylab = "Adjusted RSq", type = "l")
+plot(regfit_all_summary$cp, xlab = "Number of Variables", ylab = "Cp", type = "l")
+plot(regfit_all_summary$bic, xlab = "Number of Variables", ylab = "BIC", type = "l")
+
+```
+In the RSS model, the minimum occurs as more variables are added, such as 8.
+In the Adjusted Rsquared model, the maximum is at about 7 variables.
+In the Cp model, the minimum is at 4 variables and increases as more variables are added.
+In the BIC model, increase is shown after 3 models.
+
+I'm not sure what to choose based on this.  
+(We can choose any variable we want, and this is based on the regular fit rather than forward or backward.)
+(Below are the forward and backward models)
+
+```{r}
+#FORWARD
+par(mfrow = c(2,2))
+plot(fwdregfit_all_summary$rss, xlab = "Numer of Variables", ylab = "RSS", type ="l")
+plot(fwdregfit_all_summary$adjr2, xlab = "Number of Variables", ylab = "Adjusted RSq", type = "l")
+plot(fwdregfit_all_summary$cp, xlab = "Number of Variables", ylab = "Cp", type = "l")
+plot(fwdregfit_all_summary$bic, xlab = "Number of Variables", ylab = "BIC", type = "l")
+
+#BACKWARD
+par(mfrow = c(2,2))
+plot(bwdregfit_all_summary$rss, xlab = "Numer of Variables", ylab = "RSS", type ="l")
+plot(bwdregfit_all_summary$adjr2, xlab = "Number of Variables", ylab = "Adjusted RSq", type = "l")
+plot(bwdregfit_all_summary$cp, xlab = "Number of Variables", ylab = "Cp", type = "l")
+plot(bwdregfit_all_summary$bic, xlab = "Number of Variables", ylab = "BIC", type = "l")
+```
+^^ We just need to pick which type we want (regular, forward, or backward) and which variable we want to determine how many predictors should be used.  Then we will have our model for this part ^^
+
+
+### (c)
+```{r}
+set.seed(1)
+train <- sample(76, 38)
+train_hous <- housing[train,]
+test_hous <- housing[-train,]
+```
+
+### (d)
+
+```{r}
+regfit_train <- regsubsets(price ~ ., data = train_hous) #overall
+(regfit_train_summary <- summary(regfit_train))
+names(regfit_train_summary)
+```
+From using regsub (PAUSE)
+
+### (e)
+```{r}
+## RIDGE
+library(glmnet)
+train_matrix_small <- model.matrix(price ~ size + lot + bedrooms, data = train_hous)[,-1]
+test_matrix_small <- model.matrix(price ~ size + lot + bedrooms, data = test_hous)[,-1]
+
+ridge_housing_model_small <- cv.glmnet(train_matrix_small, train_hous$price, alpha = 0)
+lambda_ridge_small <- ridge_housing_model_small$lambda.min
+lambda_ridge_small
+
+ridge_pred_small <- predict(ridge_housing_model, s = lambda_ridge_small, newx = test_matrix_small)
+ridge_err_small <- mean((test_hous$price - ridge_pred_small)^2)
+ridge_err_small
+```
+```{r}
+## LASSO
+set.seed(1)
+lasso_housing_model_small <- cv.glmnet(train_matrix_small, train_hous$price, alpha = 1)
+lambda_lasso_small <- lasso_housing_model_small$lambda.min
+lambda_lasso_small
+
+lasso_pred_small <- predict(lasso_housing_model_small, s = lambda_lasso_small, newx = test_matrix_small)
+lasso_error_small <- mean((test_hous$price - lasso_pred_small)^2)
+lasso_error_small
+```
+Ridge has a lower error so let's use that.
+
+```{r}
+## all variables
+
+## RIDGE
+library(glmnet)
+train_matrix <- model.matrix(price ~ ., data = train_hous)[,-1]
+test_matrix <- model.matrix(price ~ ., data = test_hous)[,-1]
+
+ridge_housing_model <- cv.glmnet(train_matrix, train_hous$price, alpha = 0)
+lambda_ridge <- ridge_housing_model$lambda.min
+lambda_ridge
+
+ridge_pred <- predict(ridge_housing_model, s = lambda_ridge, newx = test_matrix)
+ridge_err <- mean((test_hous$price - ridge_pred)^2)
+ridge_err
+
+## LASSO
+set.seed(1)
+lasso_housing_model <- cv.glmnet(train_matrix, train_hous$price, alpha = 1)
+lambda_lasso <- lasso_housing_model$lambda.min
+lambda_lasso
+
+lasso_pred <- predict(lasso_housing_model, s = lambda_lasso, newx = test_matrix)
+lasso_error <- mean((test_hous$price - lasso_pred)^2)
+lasso_error
+```
+
+### (f)
+```{r}
+## PCR
+library(pls)
+set.seed(1)
+pcr_housing_model <- pcr(price ~ size + lot + bedrooms, data = train_hous, scale = TRUE, validation = "CV")
+validationplot(pcr_housing_model, val.type = "MSEP")
+summary(pcr_housing_model)
+
+pcr_pred <- predict(pcr_housing_model, test_hous, ncomp=16)
+pcr_error <- mean((test_hous$price - pcr_pred)^2)
+pcr_error
+```
+
+
+```{r}
+##PLSR
+set.seed(1)
+plsr_housing_model <- plsr(Apps ~ ., data = train_college, scale = TRUE, validation = "CV")
+summary(plsr_college)
+
+plsr_pred <- predict(plsr_college, test_college, ncomp = 10)
+plsr_error <- mean((test_college$Apps - plsr_pred)^2)
+plsr_error
+```
+
+```{r}
+## PCR
+library(pls)
+set.seed(1)
+pcr_housing_model_new <- pcr(price ~ ., data = train_hous, scale = TRUE, validation = "CV")
+validationplot(pcr_college, val.type = "MSEP")
+summary(pcr_college)
+
+pcr_pred <- predict(pcr_college, test_college, ncomp=16)
+pcr_error <- mean((test_college$Apps - pcr_pred)^2)
+pcr_error
+
+##PLSR
+set.seed(1)
+plsr_housing_model_new <- plsr(Apps ~ ., data = train_hous, scale = TRUE, validation = "CV")
+summary(plsr_housing_model_new)
+
+plsr_pred_new <- predict(plsr_housing_model_new, test_hous, ncomp = 10)
+plsr_error_new <- mean((test_hous$price - plsr_pred_new)^2)
+plsr_error_new
+```
+
+Are we supposed to do these other model comparisons on the regsubsets, on all the predictors, or just on the ones we chose in the original model?  I'm a little unclear about that.  
