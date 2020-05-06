@@ -1,0 +1,161 @@
+---
+title: "Project 2"
+author: "Ryn Mundy and Emma Potzner"
+date: "05/06/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+4.	Project Number 2 (due for your group by 1:30pm on May 6th, the end of the final exam period for the class).  Working on the same teams as last time, working with the same data as last time, and working with the same response variable as last time, do the following steps:
+a.	Consider the model that you arrived at in the previous project as the first candidate model.
+b.	Create a second candidate model by using regsubsets over the entire data set.  You can decide whether you prefer overall selection, forward selection, or backward selection, and you can decide which statistic you will use to determine the best model from the regsubsets process.  Just conduct a justifiable model selection process and report the predictors in your final model.
+c.	Create a training/test split of the data by which roughly half of the 76 observations are training data and half are test data.
+d.	Now use regsubsets over only the training data to determine the number of predictors that should be in your final model.  Then use regsubsets over the entire data set with the determined number of variables to determine your third candidate model.
+e.	Next, use either Ridge Regression or Lasso Regression with the training data, and use cross validation via the cv.glmnet function to determine the best λ value.  The model from this step with the best λ value will be your fourth candidate model.
+f.	Finally, use either  principal components regression or partial least squares regression for the training data.  Use cross validation (see the class notes or the Chapter 6 Lab from the text) to help you determine the number of components in the model and briefly explain your choice.  This model will be your 5th candidate model.
+g.	For each of the five candidate models, calculate the mean square error for predicting the outcomes in the test data set that you created in part c.   Based on this comparison, which model do you prefer for this situation?
+
+### Data Summary 
+
+In this project, we will explore this Housing data by using price as the response variable and trying to find how the other variables can be used to predict the price of a House. In the first part of this project, we created a model with price as the response variable and size, lot, and bedrooms as the predictors. 
+
+Below, we have imported the data.
+```{r}
+library(readxl)
+housing <- read_excel("~/Project 1/Housing.xlsx")
+#View(housing)
+```
+
+In our project number one we changed parts of the data so it would make more sense to the reader. For the bath variable, we changed any value that was not an integer to be listed as .5 instead of .1, allowing the reader to have a better understanding of the data analysis. 
+
+```{r}
+housing$bath[c(7,31,52,64,73) ] <- 1.5
+housing$bath[c(9,10,13,18,19,33,38,39,42,46,48,57,58,67,69,72) ] <- 2.5               
+housing$bath[c(41,54,59,60,61,62,63) ] <- 3.5
+housing$bath[c(7,31,52,64,73) ] 
+housing$bath[c(9,10,13,18,19,33,38,39,42,46,48,57,58,67,69,72) ]                
+housing$bath[c(41,54,59,60,61,62,63) ]
+```
+
+**In this project, we will be starting with the same model we created in our first project. In this model, price is the response variable and the predictors are size, lot, and bedrooms.**
+
+### Part (a): Consider the model that you arrived at in the previous project as the first candidate model.
+```{r}
+original_housing_model <- lm(price ~ size + lot + bedrooms, data = housing)
+```
+
+### Part (b): Create a second candidate model by using regsubsets over the entire data set. You can decide whether you prefer overall selection, forward selection, or backward selection, and you can decide which statistic you will use to determine the best model from the regsubsets process.  Just conduct a justifiable model selection process and report the predictors in your final model.
+
+*For this part of our project, we decided to create a second candidate model by using forward selection. After using regsubsets, we notice a few things: garagesize appears to be a significant predictor in any model with up to 9 predictors. Elemhariris and elemedison also appear to be statistically significant predictors when we use a model with 2 or more predictors.*
+
+```{r}
+library(leaps)
+fwdregfit_all <- regsubsets(price ~., data = housing, method = "forward")#picking forward
+(fwdregfit_all_summary <- summary(fwdregfit_all))
+```
+*To determine which is the best predictor, we'll look at the R^2 variable ans RSS, Cp, BIC, and Adjusted R^2 plots.*
+```{r}
+fwdregfit_all_summary$rsq
+```
+
+```{r}
+#FORWARD
+par(mfrow = c(2,2))
+plot(fwdregfit_all_summary$rss, xlab = "Numer of Variables", ylab = "RSS", type ="l")
+plot(fwdregfit_all_summary$adjr2, xlab = "Number of Variables", ylab = "Adjusted RSq", type = "l")
+plot(fwdregfit_all_summary$cp, xlab = "Number of Variables", ylab = "Cp", type = "l")
+plot(fwdregfit_all_summary$bic, xlab = "Number of Variables", ylab = "BIC", type = "l")
+```
+
+In the RSS model, the minimum occurs as more variables are added, such as 8.
+In the Adjusted Rsquared model, the maximum is at about 8 variables.
+In the Cp model, the minimum is at 6 variables.
+In the BIC model, the miniumum occurs at 6 variables and increases as more variables are added.
+
+**Both the CP and BIC plots have a minimum at 6 variables, indicating that 6 variables is the optimal amount of predictors for our model.**
+
+```{r}
+reg.all.model <- regsubsets(price ~., data = housing, method = "forward")
+coef(reg.all.model ,6)
+```
+**In our new model based on forward selection, our predictors are size, lot, status2, elemcrest, elemharris, and elemparker.**
+
+### Part (c): Create a training/test split of the data by which roughly half of the 76 observations are training data and half are test data.
+```{r}
+set.seed(1)
+train <- sample(76, 38)
+train_hous <- housing[train,]
+test_hous <- housing[-train,]
+original_pred <- predict(original_housing_model, test_hous)
+```
+
+### Part (d): Now use regsubsets over only the training data to determine the number of predictors that should be in your final model. Then use regsubsets over the entire data set with the determined number of variables to determine your third candidate model.
+
+```{r}
+regfit_train <- regsubsets(price ~ ., data = train_hous) #overall
+(regfit_train_summary <- summary(regfit_train))
+names(regfit_train_summary)
+```
+```{r}
+par(mfrow = c(2,2))
+plot(regfit_train_summary$rss, xlab = "Numer of Variables", ylab = "RSS", type ="l")
+plot(regfit_train_summary$adjr2, xlab = "Number of Variables", ylab = "Adjusted RSq", type = "l")
+plot(regfit_train_summary$cp, xlab = "Number of Variables", ylab = "Cp", type = "l")
+plot(regfit_train_summary$bic, xlab = "Number of Variables", ylab = "BIC", type = "l")
+```
+
+```{r}
+coef(regfit_train, 6)
+```
+**In this new model based on forward selection, our predictors are size, lot, elemcrest, elemharris, and elemparker, and agestandardized.**
+
+### Part (e): Next, use either Ridge Regression or Lasso Regression with the training data, and use cross validation via the cv.glmnet function to determine the best λ value.  The model from this step with the best λ value will be your fourth candidate model.
+*We chose to use Ridge Regression because it had a lower error than Lasso Regression.*
+```{r}
+## RIDGE
+library(glmnet)
+set.seed(1)
+train_matrix <- model.matrix(price ~ ., data = train_hous)[,-1]
+test_matrix <- model.matrix(price ~ ., data = test_hous)[,-1]
+
+ridge_housing_model <- cv.glmnet(train_matrix, train_hous$price, alpha = 0)
+lambda_ridge <- ridge_housing_model$lambda.min
+lambda_ridge
+
+ridge_pred <- predict(ridge_housing_model, s = lambda_ridge, newx = test_matrix)
+```
+
+**According to Ridge Regression, the best λ value is 35.17193**
+
+### Part (f): Finally, use either  principal components regression or partial least squares regression for the training data.  Use cross validation (see the class notes or the Chapter 6 Lab from the text) to help you determine the number of components in the model and briefly explain your choice.  This model will be your 5th candidate model.
+
+*We chose to use PLSR because it had a lower error than PLS.*
+
+```{r}
+##PLSR
+library(pls)
+set.seed(1)
+plsr_housing_model <- plsr(price ~ ., data = train_hous, scale = TRUE, validation = "CV")
+summary(plsr_housing_model)
+
+plsr_pred <- predict(plsr_housing_model, test_hous, ncomp = 2)
+```
+
+**The PLSR model shows that the ncomp should be 2 because that gives the lowest cross validatoin of 51.81**
+
+
+### Part (g): For each of the five candidate models, calculate the mean square error for predicting the outcomes in the test data set that you created in part c. Based on this comparison, which model do you prefer for this situation?
+```{r}
+original_error <- mean((test_hous$price - original_pred)^2) 
+original_error # model 1
+
+ridge_err <- mean((test_hous$price - ridge_pred)^2)
+ridge_err # model 4
+
+plsr_error <- mean((test_hous$price - plsr_pred)^2)
+plsr_error # model 5
+```
+**We were able to find the mean square error for our models that did not use resubsets. Based on the mean square errors for our other three models, we prefer the Ridge Regression model because it has the lowest error.**
